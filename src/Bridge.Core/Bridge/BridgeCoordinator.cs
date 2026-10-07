@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using System.Globalization;
 using Bridge.Core.Abstractions;
 using Bridge.Core.ModelProtocol;
 using Bridge.Core.Osc;
@@ -78,6 +79,9 @@ public sealed class BridgeCoordinator
                     case TickEvent tick:
                         await HandleTickAsync(tick.Now, cancellationToken);
                         break;
+                    case ManualModelCommandEvent command:
+                        await HandleManualModelCommandAsync(command.Data, command.Source, cancellationToken);
+                        break;
                 }
             }
         }
@@ -85,6 +89,27 @@ public sealed class BridgeCoordinator
         {
             await timerTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
+    }
+
+    public bool TryQueueModelCommand(byte data, string source = "panel WWW")
+    {
+        if (data == ModelProtocolConstants.StartByte)
+        {
+            return false;
+        }
+
+        return _events.Writer.TryWrite(new ManualModelCommandEvent(data, source));
+    }
+
+    public bool TryQueueOscModelCommand(string address)
+    {
+        var message = new OscMessage(address);
+        if (!TryReadModelCommands(message, out var commands) || commands.Count == 0)
+        {
+            return false;
+        }
+
+        return _events.Writer.TryWrite(new OscMessageEvent(message));
     }
 
     private void OnSerialBytesReceived(ReadOnlyMemory<byte> bytes) =>
@@ -180,6 +205,23 @@ public sealed class BridgeCoordinator
 
     private async Task HandleOscMessageAsync(OscMessage message, CancellationToken cancellationToken)
     {
+        if (TryReadModelCommands(message, out var modelCommands))
+        {
+            if (modelCommands.Count == 0)
+            {
+                _log.Warning($"Nieprawidłowa lub nieobsługiwana komenda OSC makiety: {message.Address}.");
+                return;
+            }
+
+            _log.Info(
+                $"OSC {message.Address}: sekwencja {string.Join(" → ", modelCommands.Select(value => $"0x{value:X2}"))}.");
+            foreach (var modelCommand in modelCommands)
+            {
+                await HandleManualModelCommandAsync(modelCommand, $"OSC {message.Address}", cancellationToken);
+            }
+            return;
+        }
+
         var now = DateTimeOffset.UtcNow;
         _lastMilluminMessageAt = now;
         if (!_milluminOnline)
@@ -221,6 +263,117 @@ public sealed class BridgeCoordinator
                 await _stateStore.SaveAsync(_state, cancellationToken);
                 QueueModelStatus(ModelProtocolConstants.NoScenario);
             }
+        }
+    }
+
+    private async Task HandleManualModelCommandAsync(byte data, string source, CancellationToken cancellationToken)
+    {
+        if (data == ModelProtocolConstants.StartByte)
+        {
+            _log.Warning($"{source}: 0x29 is the frame marker and cannot be sent as DATA.");
+            return;
+        }
+
+        _log.Info($"{source}: queued model command 0x{data:X2} ({ModelCommandCatalog.Get(data).Name}).");
+        if (ModelProtocolConstants.TryCreateAcknowledgement(data, out _))
+        {
+            _modelOutputQueue.Enqueue(data);
+            return;
+        }
+
+        await SendRawModelFrameAsync(data, cancellationToken);
+    }
+
+    private static bool TryReadModelCommands(OscMessage message, out IReadOnlyList<byte> commands)
+    {
+        if (ModelCommandCatalog.TryGetByOscAddress(message.Address, out var definition))
+        {
+            commands = [definition.Data];
+            return true;
+        }
+
+        var segments = message.Address.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 5 &&
+            segments[0].Equals("makieta", StringComparison.OrdinalIgnoreCase) &&
+            segments[1].Equals("balon", StringComparison.OrdinalIgnoreCase) &&
+            segments[3].Equals("predkosc", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(segments[2], NumberStyles.None, CultureInfo.InvariantCulture, out var balloon) &&
+                balloon is >= 1 and <= 3 &&
+                int.TryParse(segments[4], NumberStyles.None, CultureInfo.InvariantCulture, out var percent) &&
+                percent is >= 10 and <= 100 && percent % 10 == 0)
+            {
+                var activeValue = (byte)(0x0F + (percent / 10));
+                var balloonOn = (byte)(0x1B + ((balloon - 1) * 2));
+                commands = [activeValue, balloonOn];
+                return true;
+            }
+
+            commands = [];
+            return true;
+        }
+
+        if (segments.Length == 5 &&
+            segments[0].Equals("makieta", StringComparison.OrdinalIgnoreCase) &&
+            segments[1].Equals("slupy", StringComparison.OrdinalIgnoreCase) &&
+            segments[2].Equals("sektor", StringComparison.OrdinalIgnoreCase) &&
+            segments[4].Equals("on", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(segments[3], NumberStyles.None, CultureInfo.InvariantCulture, out var sector) &&
+                sector is >= 1 and <= 7)
+            {
+                commands =
+                [
+                    ModelProtocolConstants.ClearSectorSelection,
+                    (byte)(ModelProtocolConstants.ToggleSector1 + sector - 1),
+                    ModelProtocolConstants.PolesApplySectorSelection
+                ];
+                return true;
+            }
+
+            commands = [];
+            return true;
+        }
+
+        const string prefix = "/bridge/model/command/";
+        if (message.Address.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var value = message.Address[prefix.Length..];
+            if (byte.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var legacyData))
+            {
+                commands = [legacyData];
+                return true;
+            }
+
+            commands = [];
+            return true;
+        }
+
+        if (!message.Address.Equals("/bridge/model/command", StringComparison.OrdinalIgnoreCase) ||
+            message.Arguments.Count == 0)
+        {
+            commands = [];
+            return message.Address.StartsWith("/makieta/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        switch (message.Arguments[0])
+        {
+            case int integer when integer is >= byte.MinValue and <= byte.MaxValue:
+                commands = [(byte)integer];
+                return true;
+            case string text:
+                text = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
+                if (byte.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var textData))
+                {
+                    commands = [textData];
+                    return true;
+                }
+
+                commands = [];
+                return true;
+            default:
+                commands = [];
+                return true;
         }
     }
 
@@ -408,6 +561,7 @@ public sealed class BridgeCoordinator
     private sealed record OscMessageEvent(OscMessage Message) : BridgeEvent;
     private sealed record SerialConnectionEvent(bool Connected, string? Port) : BridgeEvent;
     private sealed record TickEvent(DateTimeOffset Now) : BridgeEvent;
+    private sealed record ManualModelCommandEvent(byte Data, string Source) : BridgeEvent;
     private sealed record PendingModelCommand(
         byte Data,
         byte ExpectedAck,

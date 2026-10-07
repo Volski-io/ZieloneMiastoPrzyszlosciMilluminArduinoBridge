@@ -2,10 +2,11 @@ using System.IO.Enumeration;
 using System.IO.Ports;
 using Bridge.Core.Abstractions;
 using Bridge.Host.Configuration;
+using Bridge.Host.Telemetry;
 
 namespace Bridge.Host.Serial;
 
-public sealed class SerialPortTransport(SerialOptions options, IBridgeLog log) : ISerialTransport
+public sealed class SerialPortTransport(SerialOptions options, IBridgeLog log, TrafficJournal? traffic = null) : ISerialTransport
 {
     private readonly object _gate = new();
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -55,6 +56,7 @@ public sealed class SerialPortTransport(SerialOptions options, IBridgeLog log) :
                     _port = port;
                 }
 
+                traffic?.RecordSerialConnection(true, portName);
                 ConnectionChanged?.Invoke(true, portName);
                 await ReadLoopAsync(port, cancellationToken);
             }
@@ -86,6 +88,7 @@ public sealed class SerialPortTransport(SerialOptions options, IBridgeLog log) :
                         log.Debug($"Ignoring serial close error: {exception.Message}");
                     }
 
+                    traffic?.RecordSerialConnection(false, portName);
                     ConnectionChanged?.Invoke(false, portName);
                 }
             }
@@ -112,6 +115,7 @@ public sealed class SerialPortTransport(SerialOptions options, IBridgeLog log) :
 
             await port.BaseStream.WriteAsync(bytes, cancellationToken);
             await port.BaseStream.FlushAsync(cancellationToken);
+            traffic?.RecordSerialSent(bytes.Span);
         }
         finally
         {
@@ -143,6 +147,7 @@ public sealed class SerialPortTransport(SerialOptions options, IBridgeLog log) :
                 throw new IOException("Serial stream ended.");
             }
 
+            traffic?.RecordSerialReceived(buffer.AsSpan(0, count));
             BytesReceived?.Invoke(buffer.AsMemory(0, count).ToArray());
         }
     }

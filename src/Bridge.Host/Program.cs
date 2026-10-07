@@ -4,6 +4,8 @@ using Bridge.Host.Logging;
 using Bridge.Host.Osc;
 using Bridge.Host.Persistence;
 using Bridge.Host.Serial;
+using Bridge.Host.Telemetry;
+using Bridge.Host.Web;
 
 namespace Bridge.Host;
 
@@ -11,6 +13,17 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        using var instanceMutex = new Mutex(
+            initiallyOwned: true,
+            name: "MilluminArduinoBridge.SingleInstance",
+            createdNew: out var isFirstInstance);
+        if (!isFirstInstance)
+        {
+            Console.Error.WriteLine(
+                "Bridge jest już uruchomiony. Zatrzymaj poprzednią instancję (Ctrl+C) przed ponownym startem.");
+            return 2;
+        }
+
         var configPath = GetArgument(args, "--config")
             ?? Path.Combine(AppContext.BaseDirectory, "appsettings.json");
         var validateOnly = args.Contains("--validate-config", StringComparer.OrdinalIgnoreCase);
@@ -29,22 +42,29 @@ public static class Program
             Console.CancelKeyPress += (_, eventArgs) =>
             {
                 eventArgs.Cancel = true;
-                cancellation.Cancel();
+                TryCancel(cancellation);
             };
-            AppDomain.CurrentDomain.ProcessExit += (_, _) => cancellation.Cancel();
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => TryCancel(cancellation);
 
-            await using var serial = new SerialPortTransport(options.Serial, log);
-            await using var osc = new UdpOscTransport(options.Millumin, log);
+            var traffic = new TrafficJournal();
+            await using var serial = new SerialPortTransport(options.Serial, log, traffic);
+            await using var osc = new UdpOscTransport(options.Millumin, log, traffic);
             var stateStore = new JsonStateStore(options.State.FilePath, log);
             var coordinator = new BridgeCoordinator(serial, osc, stateStore, log, options.ToCoordinatorOptions());
 
             log.Info($"Starting bridge with configuration '{Path.GetFullPath(configPath)}'.");
-            var tasks = new[]
+            var tasks = new List<Task>
             {
                 serial.RunAsync(cancellation.Token),
                 osc.RunAsync(cancellation.Token),
                 coordinator.RunAsync(cancellation.Token)
             };
+
+            if (options.Web.Enabled)
+            {
+                tasks.Add(WebPanel.RunAsync(options, serial, osc, coordinator, traffic, cancellation.Token));
+                log.Info($"Test panel: {options.Web.ListenUrl}");
+            }
 
             var completed = await Task.WhenAny(tasks);
             if (!cancellation.IsCancellationRequested)
@@ -74,5 +94,16 @@ public static class Program
         }
 
         return null;
+    }
+
+    private static void TryCancel(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 }

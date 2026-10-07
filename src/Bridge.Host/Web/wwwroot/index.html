@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Millumin UART Bridge — panel testowy</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Millumin UART Bridge</p>
+      <h1>Panel testowy protokołu makiety</h1>
+      <p class="subtitle">Ręczne wysyłanie ramek UART, mapa OSC i podgląd ruchu w obu kierunkach.</p>
+    </div>
+    <div class="status-grid" aria-live="polite">
+      <div class="status-card">
+        <span class="status-label">UART</span>
+        <strong id="serialStatus">Sprawdzanie…</strong>
+        <small id="serialDetails">—</small>
+      </div>
+      <div class="status-card">
+        <span class="status-label">OSC</span>
+        <strong id="oscStatus">Sprawdzanie…</strong>
+        <small id="oscDetails">—</small>
+        <button id="oscPing" class="button status-action" type="button">Test /ping</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel sequence-panel">
+      <div class="section-heading">
+        <div>
+          <h2>Parametryzowane sekwencje OSC</h2>
+          <p>Bridge kolejkuje kroki i czeka na poprawny ACK każdego z nich.</p>
+        </div>
+      </div>
+      <div class="sequence-grid">
+        <article>
+          <code>/makieta/balon/{1-3}/predkosc/{10-100}</code>
+          <p>Ustawia aktywną wartość procentową, a następnie uruchamia wskazany balon.</p>
+          <span>Przykład: <code>/makieta/balon/2/predkosc/70</code></span>
+          <div class="sequence-actions">
+            <select id="balloonNumber" aria-label="Numer balonu">
+              <option value="1">Balon 1</option><option value="2" selected>Balon 2</option><option value="3">Balon 3</option>
+            </select>
+            <select id="balloonSpeed" aria-label="Prędkość balonu">
+              <option>10</option><option>20</option><option>30</option><option>40</option><option>50</option>
+              <option>60</option><option selected>70</option><option>80</option><option>90</option><option>100</option>
+            </select>
+            <button id="sendBalloonSequence" class="button primary" type="button">Wyślij</button>
+          </div>
+        </article>
+        <article>
+          <code>/makieta/slupy/sektor/{1-7}/on</code>
+          <p>Czyści wybór, wybiera dokładnie jeden sektor, a następnie stosuje wybór do słupów.</p>
+          <span>Przykład: <code>/makieta/slupy/sektor/3/on</code></span>
+          <div class="sequence-actions">
+            <select id="poleSector" aria-label="Sektor słupów">
+              <option value="1">Sektor 1</option><option value="2">Sektor 2</option><option value="3" selected>Sektor 3</option>
+              <option value="4">Sektor 4</option><option value="5">Sektor 5</option><option value="6">Sektor 6</option><option value="7">Sektor 7</option>
+            </select>
+            <button id="sendPoleSequence" class="button primary" type="button">Wyślij</button>
+          </div>
+        </article>
+        <article>
+          <code>/makieta/sektory/wyczysc</code>
+          <p><code>0x50</code> wybiera wszystkie, <code>0x51-0x58</code> przełącza sektory, a <code>0x59</code> odznacza wszystkie.</p>
+          <span>Komenda ON urządzenia sektorowego stosuje aktualny wybór.</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel controls-panel">
+      <div class="section-heading">
+        <div>
+          <h2>Komendy</h2>
+          <p>Każdy przycisk wysyła ramkę <code>29 DATA CRC</code>. Polecenia oczekujące ACK korzystają z mechanizmu ponowień bridge’a.</p>
+        </div>
+        <span id="commandCount" class="count">0 pozycji</span>
+      </div>
+
+      <div class="toolbar">
+        <label class="field field-grow">
+          <span>Szukaj</span>
+          <input id="searchInput" type="search" placeholder="Nazwa, hex, przewód lub OSC">
+        </label>
+        <label class="field">
+          <span>Kategoria</span>
+          <select id="categoryFilter"><option value="">Wszystkie</option></select>
+        </label>
+        <label class="field compact-field">
+          <span>Własny DATA</span>
+          <span class="input-action">
+            <input id="customHex" maxlength="4" value="54" aria-label="Bajt DATA w hex">
+            <button id="customSend" class="button primary" type="button">Wyślij</button>
+          </span>
+        </label>
+      </div>
+
+      <div class="table-wrap command-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>DATA</th>
+              <th>Funkcja</th>
+              <th>Ramka / ACK</th>
+              <th>Powiązanie OSC</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="commandsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel log-panel">
+      <div class="section-heading log-heading">
+        <div>
+          <h2>Log transmisji</h2>
+          <p>Odebrane i wysłane dane z tłumaczeniem oraz surowymi bajtami.</p>
+        </div>
+        <div class="log-actions">
+          <label class="toggle"><input id="pauseLogs" type="checkbox"> Wstrzymaj widok</label>
+          <select id="channelFilter" aria-label="Filtr kanału">
+            <option value="">Wszystkie kanały</option>
+            <option value="UART">UART</option>
+            <option value="OSC">OSC</option>
+            <option value="SYSTEM">System</option>
+          </select>
+          <button id="clearLogs" class="button subtle" type="button">Wyczyść log</button>
+        </div>
+      </div>
+
+      <div class="table-wrap log-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Czas</th>
+              <th>Kanał</th>
+              <th>Kierunek</th>
+              <th>Komenda</th>
+              <th>Tłumaczenie</th>
+              <th>Raw bytes</th>
+            </tr>
+          </thead>
+          <tbody id="logsBody"></tbody>
+        </table>
+        <div id="emptyLogs" class="empty-state">Brak zarejestrowanych transmisji.</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

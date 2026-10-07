@@ -6,6 +6,12 @@ public static class ModelProtocolConstants
     public const byte AckFailed = 0x01;
     public const byte NoScenario = 0x02;
     public const byte ScenarioRunning = 0x03;
+    public const byte PolesOff = 0x20;
+    public const byte PolesApplySectorSelection = 0x21;
+    public const byte SelectAllSectors = 0x50;
+    public const byte ToggleSector1 = 0x51;
+    public const byte ToggleSector8 = 0x58;
+    public const byte ClearSectorSelection = 0x59;
     public const byte Scenario1 = 0x78;
     public const byte Scenario8 = 0x7F;
     public const byte ChecksumFailed = 0x80;

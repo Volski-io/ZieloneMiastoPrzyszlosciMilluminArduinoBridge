@@ -3,10 +3,11 @@ using System.Net.Sockets;
 using Bridge.Core.Abstractions;
 using Bridge.Core.Osc;
 using Bridge.Host.Configuration;
+using Bridge.Host.Telemetry;
 
 namespace Bridge.Host.Osc;
 
-public sealed class UdpOscTransport(MilluminOptions options, IBridgeLog log) : IOscTransport
+public sealed class UdpOscTransport(MilluminOptions options, IBridgeLog log, TrafficJournal? traffic = null) : IOscTransport
 {
     private readonly UdpClient _sender = new();
     private UdpClient? _receiver;
@@ -35,6 +36,7 @@ public sealed class UdpOscTransport(MilluminOptions options, IBridgeLog log) : I
             foreach (var message in OscPacketCodec.Decode(result.Buffer))
             {
                 log.Debug($"OSC RX {message.Address} [{string.Join(", ", message.Arguments)}].");
+                traffic?.RecordOsc("RX", message, result.Buffer);
                 MessageReceived?.Invoke(message);
             }
         }
@@ -45,6 +47,7 @@ public sealed class UdpOscTransport(MilluminOptions options, IBridgeLog log) : I
         var endpoint = _remoteEndpoint ??= await ResolveEndpointAsync(options.Host, options.InputPort, cancellationToken);
         var packet = OscPacketCodec.Encode(message);
         await _sender.SendAsync(packet, endpoint, cancellationToken);
+        traffic?.RecordOsc("TX", message, packet);
         log.Debug($"OSC TX {message.Address} [{string.Join(", ", message.Arguments)}].");
     }
 

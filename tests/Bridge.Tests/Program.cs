@@ -14,7 +14,11 @@ public static class Program
         ("Frame parser handles noise and split input", TestFrameParserAsync),
         ("Frame parser reports invalid checksum", TestInvalidChecksumAsync),
         ("Scenario and ACK mappings match workbook", TestScenarioMappingsAsync),
+        ("Command catalog covers every byte", TestCommandCatalogAsync),
         ("OSC codec round-trips supported values", TestOscRoundTripAsync),
+        ("Readable OSC command address sends a UART frame", TestOscModelCommandAsync),
+        ("Parameterized balloon OSC queues speed then start", TestOscBalloonSequenceAsync),
+        ("Parameterized pole OSC clears, selects and applies sector", TestOscPoleSequenceAsync),
         ("Coordinator ACKs and launches a scenario", TestCoordinatorScenarioAsync),
         ("Coordinator restores persisted state after OSC reconnect", TestCoordinatorRestoreAsync)
     ];
@@ -94,6 +98,19 @@ public static class Program
         return Task.CompletedTask;
     }
 
+    private static Task TestCommandCatalogAsync()
+    {
+        Equal(256, ModelCommandCatalog.All.Count);
+        Equal("29 54 AB", ModelCommandCatalog.Get(0x54).FrameHex);
+        Equal("/makieta/sektory/4/przelacz", ModelCommandCatalog.Get(0x54).OscAddress);
+        Equal("Wyczyść wybór sektorów", ModelCommandCatalog.Get(0x59).Name);
+        Equal("/makieta/sektory/wyczysc", ModelCommandCatalog.Get(0x59).OscAddress);
+        Equal("Biurowiec 1 off", ModelCommandCatalog.Get(0x3C).Name);
+        True(!ModelCommandCatalog.Get(0x29).IsSendable);
+        Equal("ACK 0x78: Wciśnięto scenariusz 1", ModelCommandCatalog.Get(0xF8).Name);
+        return Task.CompletedTask;
+    }
+
     private static Task TestOscRoundTripAsync()
     {
         var source = new OscMessage("/test", 42, "Scena 1", 0.5f, true, false);
@@ -108,6 +125,81 @@ public static class Program
         Equal(true, decoded[0].Arguments[3]);
         Equal(false, decoded[0].Arguments[4]);
         return Task.CompletedTask;
+    }
+
+    private static async Task TestOscModelCommandAsync()
+    {
+        var serial = new FakeSerialTransport();
+        var osc = new FakeOscTransport();
+        var coordinator = new BridgeCoordinator(serial, osc, new MemoryStateStore(), new TestLog(), FastOptions());
+        using var cancellation = new CancellationTokenSource();
+        var runTask = coordinator.RunAsync(cancellation.Token);
+
+        osc.Emit(new OscMessage("/makieta/sektory/4/przelacz"));
+        await WaitUntilAsync(() => serial.Sent.Any(frame => frame.SequenceEqual(ModelFrameCodec.Encode(0x54))));
+
+        cancellation.Cancel();
+        await runTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+    }
+
+    private static async Task TestOscBalloonSequenceAsync()
+    {
+        var serial = new FakeSerialTransport();
+        var osc = new FakeOscTransport();
+        var coordinator = new BridgeCoordinator(serial, osc, new MemoryStateStore(), new TestLog(), FastOptions());
+        using var cancellation = new CancellationTokenSource();
+        var runTask = coordinator.RunAsync(cancellation.Token);
+
+        osc.Emit(new OscMessage("/makieta/balon/2/predkosc/70"));
+        await WaitUntilAsync(() => ContainsFrame(serial, 0x16));
+        serial.Emit(ModelFrameCodec.Encode(0x96));
+        await WaitUntilAsync(() => ContainsFrame(serial, 0x1D));
+
+        var sent = serial.Sent.ToArray();
+        True(IndexOfFrame(sent, 0x16) < IndexOfFrame(sent, 0x1D));
+
+        cancellation.Cancel();
+        await runTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+    }
+
+    private static async Task TestOscPoleSequenceAsync()
+    {
+        var serial = new FakeSerialTransport();
+        var osc = new FakeOscTransport();
+        var coordinator = new BridgeCoordinator(serial, osc, new MemoryStateStore(), new TestLog(), FastOptions());
+        using var cancellation = new CancellationTokenSource();
+        var runTask = coordinator.RunAsync(cancellation.Token);
+
+        osc.Emit(new OscMessage("/makieta/slupy/sektor/3/on"));
+        await WaitUntilAsync(() => ContainsFrame(serial, 0x59));
+        serial.Emit(ModelFrameCodec.Encode(0xD9));
+        await WaitUntilAsync(() => ContainsFrame(serial, 0x53));
+        serial.Emit(ModelFrameCodec.Encode(0xD3));
+        await WaitUntilAsync(() => ContainsFrame(serial, 0x21));
+
+        var sent = serial.Sent.ToArray();
+        True(IndexOfFrame(sent, 0x59) < IndexOfFrame(sent, 0x53));
+        True(IndexOfFrame(sent, 0x53) < IndexOfFrame(sent, 0x21));
+
+        cancellation.Cancel();
+        await runTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+    }
+
+    private static bool ContainsFrame(FakeSerialTransport serial, byte data) =>
+        serial.Sent.Any(frame => frame.SequenceEqual(ModelFrameCodec.Encode(data)));
+
+    private static int IndexOfFrame(IReadOnlyList<byte[]> frames, byte data)
+    {
+        var expected = ModelFrameCodec.Encode(data);
+        for (var index = 0; index < frames.Count; index++)
+        {
+            if (frames[index].SequenceEqual(expected))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private static async Task TestCoordinatorScenarioAsync()

@@ -114,6 +114,92 @@ cp config/appsettings.example.json src/Bridge.Host/appsettings.json
 dotnet run --project src/Bridge.Host -- --config src/Bridge.Host/appsettings.json
 ```
 
+### Test na Windows
+
+W PowerShellu, w katalogu projektu:
+
+```powershell
+.\scripts\run-windows.ps1
+```
+
+Przy pierwszym uruchomieniu powstanie `config/appsettings.windows.json`. Program automatycznie wykrywa porty `COM*`; gdy jest ich kilka, wpisz konkretną nazwę w `Serial.PortName`, np. `COM4`.
+
+Panel testowy jest dostępny lokalnie pod adresem:
+
+```text
+http://127.0.0.1:8080
+```
+
+Aby udostępnić panel innym urządzeniom w sieci lokalnej, ustaw `Web.ListenUrl` na
+`http://0.0.0.0:8080`, a następnie uruchom jako Administrator:
+
+```powershell
+.\scripts\open-windows-firewall.ps1
+```
+
+Reguły zapory dopuszczają TCP `8080` i feedback OSC UDP `5001` wyłącznie z
+lokalnej podsieci. Panel otwiera się wtedy pod adresem IP komputera z bridgem,
+np. `http://192.168.50.197:8080`.
+
+Panel zawiera wszystkie wartości DATA `0x00–0xFF`, opis funkcji, gotową ramkę z CRC, oczekiwany ACK i odpowiadające wywołanie OSC. Rejestruje ramki UART i pakiety OSC w obu kierunkach, pokazując tłumaczenie oraz surowe bajty.
+
+Każda wysyłalna komenda ma czytelny adres OSC. Wiadomość należy wysłać na port
+feedback bridge'a, domyślnie UDP `5001`. Przykładowo:
+
+```text
+/makieta/sektory/4/przelacz
+/makieta/scenariusz/1/uruchom
+```
+
+Pierwszy adres wysyła DATA `0x54`, czyli ramkę `29 54 AB`. Drugi uruchamia
+scenariusz 1 komendą DATA `0x78`. Pełna lista adresów znajduje się w panelu
+testowym obok każdej komendy.
+
+Bridge obsługuje także parametryzowane sekwencje:
+
+```text
+/makieta/balon/2/predkosc/70
+/makieta/slupy/sektor/3/on
+```
+
+Pierwsza sekwencja wysyła wartość `70%` (`0x16`), czeka na ACK `0x96`, a potem
+uruchamia balon 2 (`0x1D`). Druga czyści wybór sektorów (`0x59`), wybiera sektor
+3 (`0x53`) i stosuje wybór do słupów (`0x21`). Każdy krok czeka na własny ACK.
+
+Wybór sektorów jest globalny dla elementów opisanych zakresami w nawiasach:
+
+- `0x50` wybiera wszystkie sektory;
+- `0x51–0x58` przełącza wybór danego sektora;
+- `0x59` czyści cały wybór;
+- komenda ON urządzenia sektorowego stosuje aktualny wybór. Jeżeli wybór jest
+  pusty, np. po `0x59`, komenda ON taka jak `0x23` wyłącza wszystkie elementy.
+
+Dla zgodności ze starszymi integracjami nadal działają adresy bajtowe:
+
+```text
+/bridge/model/command/54
+/bridge/model/command 84
+```
+
+### Samodzielny tester OSC na Windows
+
+Uruchom dwuklikiem `scripts\osc-tester.cmd` albo z PowerShella:
+
+```powershell
+.\scripts\osc-tester.ps1
+```
+
+Okno pozwala podać adres docelowy, port UDP, adres OSC i argumenty w formacie
+JSON. Gotowe presety testują sekwencję balonu 2 z prędkością 70%, uruchomienie
+sektora 3 słupów oraz `/ping` do Millumina.
+
+Wysyłka bez otwierania okna:
+
+```powershell
+.\scripts\osc-tester.ps1 -SendOnce -TargetHost 127.0.0.1 -Port 5001 `
+  -Address /makieta/balon/2/predkosc/70 -ArgumentsJson "[]"
+```
+
 Walidacja konfiguracji bez otwierania portów:
 
 ```bash

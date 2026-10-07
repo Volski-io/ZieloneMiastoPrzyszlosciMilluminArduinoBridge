@@ -10,6 +10,7 @@ public sealed record AppOptions
     public ReliabilityOptions Reliability { get; init; } = new();
     public StateOptions State { get; init; } = new();
     public LoggingOptions Logging { get; init; } = new();
+    public WebOptions Web { get; init; } = new();
     public List<ScenarioOptions> Scenarios { get; init; } =
         Enumerable.Range(1, 8)
             .Select(number => new ScenarioOptions { Scenario = number, Column = new ColumnTarget { Index = number } })
@@ -43,6 +44,12 @@ public sealed record AppOptions
         if (Millumin.InputPort is <= 0 or > 65535 || Millumin.FeedbackPort is <= 0 or > 65535)
         {
             throw new InvalidOperationException("Millumin OSC ports must be between 1 and 65535.");
+        }
+
+        if (Web.Enabled && (!Uri.TryCreate(Web.ListenUrl, UriKind.Absolute, out var webUri) ||
+            webUri.Scheme is not ("http" or "https")))
+        {
+            throw new InvalidOperationException("Web.ListenUrl must be a valid HTTP or HTTPS URL.");
         }
 
         if (Scenarios.Count != 8 || Scenarios.Select(item => item.Scenario).Distinct().Count() != 8 ||
@@ -83,6 +90,7 @@ public sealed record SerialOptions
     public int ReconnectDelayMs { get; init; } = 2000;
     public List<string> PortPatterns { get; init; } =
     [
+        "COM*",
         "/dev/cu.usbmodem*",
         "/dev/cu.usbserial*",
         "/dev/cu.SLAB_USBtoUART*",
@@ -117,6 +125,12 @@ public sealed record StateOptions
 public sealed record LoggingOptions
 {
     public bool Debug { get; init; }
+}
+
+public sealed record WebOptions
+{
+    public bool Enabled { get; init; } = true;
+    public string ListenUrl { get; init; } = "http://127.0.0.1:8080";
 }
 
 public sealed record ScenarioOptions

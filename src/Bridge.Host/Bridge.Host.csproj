@@ -9,9 +9,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Bridge.Core\Bridge.Core.csproj" />
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\..\config\appsettings.example.json" Link="appsettings.example.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Web\wwwroot\**\*" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
