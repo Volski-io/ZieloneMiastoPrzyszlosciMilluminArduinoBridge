@@ -1,6 +1,12 @@
 artifacts/
+.codex-tmp/
+.tmp/
+outputs/
 bin/
 obj/
 *.user
 *.suo
+*.inspect.ndjson
+.~lock.*#
+~$*.xlsx
 .DS_Store
