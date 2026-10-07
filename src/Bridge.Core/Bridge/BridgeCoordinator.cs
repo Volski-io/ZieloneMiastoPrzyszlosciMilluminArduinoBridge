@@ -21,7 +21,7 @@ public sealed class BridgeCoordinator
     private static readonly IReadOnlyDictionary<string, SectorOscTarget> SectorOscTargets =
         new Dictionary<string, SectorOscTarget>(StringComparer.OrdinalIgnoreCase)
         {
-            ["/makieta/slupy"] = new(7, 0x21),
+            ["/makieta/slupy"] = new(6, 0x21),
             ["/makieta/balony/led"] = new(3, 0x23),
             ["/makieta/zabudowa-mieszkaniowa/0"] = new(3, 0x5F),
             ["/makieta/budynek/1"] = new(6, 0x61),
@@ -307,23 +307,8 @@ public sealed class BridgeCoordinator
         }
 
         var segments = message.Address.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 5 &&
-            segments[0].Equals("makieta", StringComparison.OrdinalIgnoreCase) &&
-            segments[1].Equals("balon", StringComparison.OrdinalIgnoreCase) &&
-            segments[3].Equals("predkosc", StringComparison.OrdinalIgnoreCase))
+        if (TryReadNumberedDeviceSequence(segments, out commands))
         {
-            if (int.TryParse(segments[2], NumberStyles.None, CultureInfo.InvariantCulture, out var balloon) &&
-                balloon is >= 1 and <= 3 &&
-                int.TryParse(segments[4], NumberStyles.None, CultureInfo.InvariantCulture, out var percent) &&
-                percent is >= 10 and <= 100 && percent % 10 == 0)
-            {
-                var activeValue = (byte)(0x0F + (percent / 10));
-                var balloonOn = (byte)(0x1B + ((balloon - 1) * 2));
-                commands = [activeValue, balloonOn];
-                return true;
-            }
-
-            commands = [];
             return true;
         }
 
@@ -378,7 +363,8 @@ public sealed class BridgeCoordinator
     {
         commands = [];
         if (segments.Length < 5 ||
-            !segments[^3].Equals("sektor", StringComparison.OrdinalIgnoreCase) ||
+            (!segments[^3].Equals("sektor", StringComparison.OrdinalIgnoreCase) &&
+             !segments[^3].Equals("sektory", StringComparison.OrdinalIgnoreCase)) ||
             !segments[^1].Equals("on", StringComparison.OrdinalIgnoreCase))
         {
             return false;
@@ -390,18 +376,117 @@ public sealed class BridgeCoordinator
             return false;
         }
 
-        if (int.TryParse(segments[^2], NumberStyles.None, CultureInfo.InvariantCulture, out var sector) &&
-            sector >= 1 && sector <= target.MaxSector)
+        int firstSector;
+        int lastSector;
+        if (segments[^3].Equals("sektor", StringComparison.OrdinalIgnoreCase))
         {
-            commands =
-            [
-                ModelProtocolConstants.ClearSectorSelection,
-                (byte)(ModelProtocolConstants.ToggleSector1 + sector - 1),
-                target.OnCommand
-            ];
+            if (!TryReadNumber(segments[^2], target.MaxSector, out firstSector))
+            {
+                return true;
+            }
+
+            lastSector = firstSector;
+        }
+        else if (!TryReadInclusiveRange(segments[^2], target.MaxSector, out firstSector, out lastSector))
+        {
+            return true;
+        }
+
+        var sequence = new List<byte> { ModelProtocolConstants.ClearSectorSelection };
+        for (var sector = firstSector; sector <= lastSector; sector++)
+        {
+            sequence.Add((byte)(ModelProtocolConstants.ToggleSector1 + sector - 1));
+        }
+
+        sequence.Add(target.OnCommand);
+        commands = sequence;
+
+        return true;
+    }
+
+    private static bool TryReadNumberedDeviceSequence(string[] segments, out IReadOnlyList<byte> commands)
+    {
+        commands = [];
+        if (segments.Length is not (4 or 5) ||
+            !segments[0].Equals("makieta", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var (recognized, plural, target) = segments[1].ToLowerInvariant() switch
+        {
+            "wiatrak" => (true, false, new NumberedOscTarget(5, 0x04)),
+            "wiatraki" => (true, true, new NumberedOscTarget(5, 0x04)),
+            "balon" => (true, false, new NumberedOscTarget(3, 0x1A)),
+            "balony" => (true, true, new NumberedOscTarget(3, 0x1A)),
+            _ => (false, false, new NumberedOscTarget(0, 0x00))
+        };
+        if (!recognized)
+        {
+            return false;
+        }
+
+        int firstItem;
+        int lastItem;
+        if (plural)
+        {
+            if (!TryReadInclusiveRange(segments[2], target.MaxItem, out firstItem, out lastItem))
+            {
+                return true;
+            }
+        }
+        else
+        {
+            if (!TryReadNumber(segments[2], target.MaxItem, out firstItem))
+            {
+                return true;
+            }
+
+            lastItem = firstItem;
+        }
+
+        if (segments.Length == 4 && segments[3].Equals("off", StringComparison.OrdinalIgnoreCase))
+        {
+            commands = Enumerable.Range(firstItem, lastItem - firstItem + 1)
+                .Select(item => (byte)(target.FirstOffCommand + ((item - 1) * 2)))
+                .ToArray();
+            return true;
+        }
+
+        if (segments.Length == 5 &&
+            segments[3].Equals("predkosc", StringComparison.OrdinalIgnoreCase) &&
+            int.TryParse(segments[4], NumberStyles.None, CultureInfo.InvariantCulture, out var percent) &&
+            percent is >= 10 and <= 100 && percent % 10 == 0)
+        {
+            var sequence = new List<byte> { (byte)(0x0F + (percent / 10)) };
+            for (var item = firstItem; item <= lastItem; item++)
+            {
+                sequence.Add((byte)(target.FirstOffCommand + ((item - 1) * 2) + 1));
+            }
+
+            commands = sequence;
         }
 
         return true;
+    }
+
+    private static bool TryReadNumber(string value, int maximum, out int number) =>
+        int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out number) &&
+        number >= 1 && number <= maximum;
+
+    private static bool TryReadInclusiveRange(string value, int maximum, out int first, out int last)
+    {
+        first = 0;
+        last = 0;
+        var separator = value.IndexOf('-');
+        if (separator <= 0 || separator != value.LastIndexOf('-'))
+        {
+            return false;
+        }
+
+        return TryReadNumber(value[..separator], maximum, out first) &&
+               TryReadNumber(value[(separator + 1)..], maximum, out last) &&
+               first < last;
     }
 
     private async Task HandleTickAsync(DateTimeOffset now, CancellationToken cancellationToken)
@@ -597,4 +682,5 @@ public sealed class BridgeCoordinator
         int Attempts);
 
     private sealed record SectorOscTarget(int MaxSector, byte OnCommand);
+    private sealed record NumberedOscTarget(int MaxItem, byte FirstOffCommand);
 }

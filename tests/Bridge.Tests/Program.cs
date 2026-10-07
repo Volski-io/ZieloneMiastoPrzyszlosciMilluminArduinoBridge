@@ -17,8 +17,9 @@ public static class Program
         ("Command catalog covers every byte", TestCommandCatalogAsync),
         ("OSC codec round-trips supported values", TestOscRoundTripAsync),
         ("Readable OSC command address sends a UART frame", TestOscModelCommandAsync),
-        ("Parameterized balloon OSC queues speed then start", TestOscBalloonSequenceAsync),
-        ("Parameterized sector OSC covers every sector-based device", TestOscSectorSequencesAsync),
+        ("Parameterized fan and balloon OSC queues speed then start", TestOscSpeedSequencesAsync),
+        ("Parameterized fan and balloon ranges queue every element", TestOscNumberedRangesAsync),
+        ("Parameterized sector OSC covers every sector-based device and range", TestOscSectorSequencesAsync),
         ("Coordinator ACKs and launches a scenario", TestCoordinatorScenarioAsync),
         ("Coordinator restores persisted state after OSC reconnect", TestCoordinatorRestoreAsync)
     ];
@@ -142,24 +143,29 @@ public static class Program
         await runTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
     }
 
-    private static async Task TestOscBalloonSequenceAsync()
+    private static async Task TestOscSpeedSequencesAsync()
     {
-        var serial = new FakeSerialTransport();
-        var osc = new FakeOscTransport();
-        var coordinator = new BridgeCoordinator(serial, osc, new MemoryStateStore(), new TestLog(), FastOptions());
-        using var cancellation = new CancellationTokenSource();
-        var runTask = coordinator.RunAsync(cancellation.Token);
+        await AssertCommandSequenceAsync("/makieta/balon/2/predkosc/70", [0x16, 0x1D]);
+        await AssertCommandSequenceAsync("/makieta/wiatrak/5/predkosc/70", [0x16, 0x0D]);
+    }
 
-        osc.Emit(new OscMessage("/makieta/balon/2/predkosc/70"));
-        await WaitUntilAsync(() => ContainsFrame(serial, 0x16));
-        serial.Emit(ModelFrameCodec.Encode(0x96));
-        await WaitUntilAsync(() => ContainsFrame(serial, 0x1D));
+    private static async Task TestOscNumberedRangesAsync()
+    {
+        var validator = new BridgeCoordinator(
+            new FakeSerialTransport(),
+            new FakeOscTransport(),
+            new MemoryStateStore(),
+            new TestLog(),
+            FastOptions());
+        True(!validator.TryQueueOscModelCommand("/makieta/wiatraki/1-6/off"));
+        True(!validator.TryQueueOscModelCommand("/makieta/wiatraki/3-3/off"));
+        True(!validator.TryQueueOscModelCommand("/makieta/balony/3-1/predkosc/70"));
+        True(!validator.TryQueueOscModelCommand("/makieta/balony/1-3/predkosc/75"));
 
-        var sent = serial.Sent.ToArray();
-        True(IndexOfFrame(sent, 0x16) < IndexOfFrame(sent, 0x1D));
-
-        cancellation.Cancel();
-        await runTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await AssertCommandSequenceAsync("/makieta/wiatraki/1-5/predkosc/70", [0x16, 0x05, 0x07, 0x09, 0x0B, 0x0D]);
+        await AssertCommandSequenceAsync("/makieta/wiatraki/2-4/off", [0x06, 0x08, 0x0A]);
+        await AssertCommandSequenceAsync("/makieta/balony/1-3/predkosc/40", [0x13, 0x1B, 0x1D, 0x1F]);
+        await AssertCommandSequenceAsync("/makieta/balony/1-3/off", [0x1A, 0x1C, 0x1E]);
     }
 
     private static async Task TestOscSectorSequencesAsync()
@@ -172,10 +178,13 @@ public static class Program
             FastOptions());
         True(!validator.TryQueueOscModelCommand("/makieta/magazyn-energii/rgb/sektor/3/on"));
         True(!validator.TryQueueOscModelCommand("/makieta/budynek/1/sektor/7/on"));
+        True(!validator.TryQueueOscModelCommand("/makieta/slupy/sektor/7/on"));
+        True(!validator.TryQueueOscModelCommand("/makieta/slupy/sektory/4-4/on"));
+        True(!validator.TryQueueOscModelCommand("/makieta/slupy/sektory/6-2/on"));
 
-        (string Address, int Sector, byte OnCommand)[] routes =
+        (string Address, int MaxSector, byte OnCommand)[] routes =
         [
-            ("/makieta/slupy/sektor/7/on", 7, 0x21),
+            ("/makieta/slupy/sektor/6/on", 6, 0x21),
             ("/makieta/balony/led/sektor/3/on", 3, 0x23),
             ("/makieta/zabudowa-mieszkaniowa/0/sektor/3/on", 3, 0x5F),
             ("/makieta/budynek/1/sektor/6/on", 6, 0x61),
@@ -189,11 +198,25 @@ public static class Program
 
         foreach (var route in routes)
         {
-            await AssertSectorSequenceAsync(route.Address, route.Sector, route.OnCommand);
+            await AssertSectorSequenceAsync(route.Address, route.MaxSector, route.OnCommand);
+
+            var rangeAddress = route.Address
+                .Replace("/sektor/", "/sektory/", StringComparison.Ordinal)
+                .Replace($"/{route.MaxSector}/on", $"/1-{route.MaxSector}/on", StringComparison.Ordinal);
+            var expected = new List<byte> { 0x59 };
+            expected.AddRange(Enumerable.Range(1, route.MaxSector).Select(sector => (byte)(0x50 + sector)));
+            expected.Add(route.OnCommand);
+            await AssertCommandSequenceAsync(rangeAddress, expected);
         }
     }
 
     private static async Task AssertSectorSequenceAsync(string address, int sector, byte onCommand)
+    {
+        var selectionCommand = (byte)(0x50 + sector);
+        await AssertCommandSequenceAsync(address, [0x59, selectionCommand, onCommand]);
+    }
+
+    private static async Task AssertCommandSequenceAsync(string address, IReadOnlyList<byte> expectedCommands)
     {
         var serial = new FakeSerialTransport();
         var osc = new FakeOscTransport();
@@ -201,17 +224,19 @@ public static class Program
         using var cancellation = new CancellationTokenSource();
         var runTask = coordinator.RunAsync(cancellation.Token);
 
-        var selectionCommand = (byte)(0x50 + sector);
         osc.Emit(new OscMessage(address));
-        await WaitUntilAsync(() => ContainsFrame(serial, 0x59));
-        serial.Emit(ModelFrameCodec.Encode(0xD9));
-        await WaitUntilAsync(() => ContainsFrame(serial, selectionCommand));
-        serial.Emit(ModelFrameCodec.Encode((byte)(selectionCommand | 0x80)));
-        await WaitUntilAsync(() => ContainsFrame(serial, onCommand));
+        foreach (var command in expectedCommands)
+        {
+            await WaitUntilAsync(() => ContainsFrame(serial, command));
+            True(ModelProtocolConstants.TryCreateAcknowledgement(command, out var acknowledgement));
+            serial.Emit(ModelFrameCodec.Encode(acknowledgement));
+        }
 
         var sent = serial.Sent.ToArray();
-        True(IndexOfFrame(sent, 0x59) < IndexOfFrame(sent, selectionCommand));
-        True(IndexOfFrame(sent, selectionCommand) < IndexOfFrame(sent, onCommand));
+        for (var index = 1; index < expectedCommands.Count; index++)
+        {
+            True(IndexOfFrame(sent, expectedCommands[index - 1]) < IndexOfFrame(sent, expectedCommands[index]));
+        }
 
         cancellation.Cancel();
         await runTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);

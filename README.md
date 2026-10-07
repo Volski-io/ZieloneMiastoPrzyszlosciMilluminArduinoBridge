@@ -159,18 +159,37 @@ Bridge obsługuje także parametryzowane sekwencje:
 
 ```text
 /makieta/balon/2/predkosc/70
+/makieta/wiatraki/1-5/predkosc/70
 /makieta/slupy/sektor/3/on
+/makieta/slupy/sektory/2-6/on
 ```
 
 Pierwsza sekwencja wysyła wartość `70%` (`0x16`), czeka na ACK `0x96`, a potem
-uruchamia balon 2 (`0x1D`). Druga czyści wybór sektorów (`0x59`), wybiera sektor
-3 (`0x53`) i stosuje wybór do słupów (`0x21`). Każdy krok czeka na własny ACK.
+uruchamia balon 2 (`0x1D`). Druga ustawia `70%` raz i uruchamia pięć wiatraków.
+Trzecia czyści wybór sektorów (`0x59`), wybiera sektor 3 (`0x53`) i stosuje
+wybór do słupów (`0x21`). Czwarta robi to samo dla całego domkniętego zakresu.
+Każdy krok czeka na własny ACK.
+
+Numerowane wiatraki i balony obsługują komendy pojedyncze oraz zakresowe:
+
+```text
+/makieta/wiatrak/{1-5}/predkosc/{10-100}
+/makieta/wiatraki/{od}-{do}/predkosc/{10-100}
+/makieta/wiatraki/{od}-{do}/off
+/makieta/balon/{1-3}/predkosc/{10-100}
+/makieta/balony/{od}-{do}/predkosc/{10-100}
+/makieta/balony/{od}-{do}/off
+```
+
+Prędkość musi być wielokrotnością `10%`. Zakres jest domknięty, rosnący i musi
+zawierać co najmniej dwa elementy. Bridge ustawia aktywną wartość tylko raz, a
+następnie uruchamia po kolei wszystkie urządzenia z zakresu.
 
 Ten sam mechanizm działa dla wszystkich urządzeń sektorowych:
 
 | Element | Zakres | Ścieżka OSC |
 | --- | ---: | --- |
-| Słupy HV | 1–7 | `/makieta/slupy/sektor/{sektor}/on` |
+| Słupy HV | 1–6 | `/makieta/slupy/sektor/{sektor}/on` |
 | LED-y na balonach | 1–3 | `/makieta/balony/led/sektor/{sektor}/on` |
 | Zabudowa mieszkaniowa 0 | 1–3 | `/makieta/zabudowa-mieszkaniowa/0/sektor/{sektor}/on` |
 | Budynek 1 | 1–6 | `/makieta/budynek/1/sektor/{sektor}/on` |
@@ -183,6 +202,16 @@ Ten sam mechanizm działa dla wszystkich urządzeń sektorowych:
 
 Panel WWW udostępnia wspólną listę urządzeń i automatycznie ogranicza dostępne
 numery sektorów do zakresu wybranego elementu.
+
+Każdy element sektorowy z tabeli obsługuje również zakres:
+
+```text
+/makieta/{element}/sektory/{od}-{do}/on
+```
+
+Przykładowo `/makieta/budynek/3/sektory/2-7/on` czyści wybór, zaznacza sektory
+2–7 i stosuje go do budynku 3. Zakres jest domknięty i musi mieścić się w
+zakresie elementu podanym w tabeli.
 
 Wybór sektorów jest globalny dla elementów opisanych zakresami w nawiasach:
 

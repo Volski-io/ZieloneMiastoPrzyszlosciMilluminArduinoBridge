@@ -37,28 +37,40 @@
         </div>
       </div>
       <div class="sequence-grid">
-        <article>
-          <code>/makieta/balon/{1-3}/predkosc/{10-100}</code>
-          <p>Ustawia aktywną wartość procentową, a następnie uruchamia wskazany balon.</p>
-          <span>Przykład: <code>/makieta/balon/2/predkosc/70</code></span>
+        <article class="numbered-sequence-card">
+          <code id="numberedRoutePreview">/makieta/wiatraki/1-5/predkosc/70</code>
+          <p>Ustawia prędkość lub wyłącza domknięty zakres wiatraków albo balonów.</p>
+          <span>Wariant pojedynczy pozostaje dostępny przez <code>/wiatrak/{n}</code> lub <code>/balon/{n}</code>.</span>
           <div class="sequence-actions">
-            <select id="balloonNumber" aria-label="Numer balonu">
-              <option value="1">Balon 1</option><option value="2" selected>Balon 2</option><option value="3">Balon 3</option>
+            <select id="numberedDevice" aria-label="Rodzaj urządzenia">
+              <option value="/makieta/wiatraki" data-single-address="/makieta/wiatrak" data-max-item="5">Wiatraki [1-5]</option>
+              <option value="/makieta/balony" data-single-address="/makieta/balon" data-max-item="3">Balony [1-3]</option>
             </select>
-            <select id="balloonSpeed" aria-label="Prędkość balonu">
+            <select id="numberedFrom" aria-label="Pierwszy element">
+              <option value="1" selected>Od 1</option><option value="2">Od 2</option><option value="3">Od 3</option>
+              <option value="4">Od 4</option><option value="5">Od 5</option>
+            </select>
+            <select id="numberedTo" aria-label="Ostatni element">
+              <option value="1">Do 1</option><option value="2">Do 2</option><option value="3">Do 3</option>
+              <option value="4">Do 4</option><option value="5" selected>Do 5</option>
+            </select>
+            <select id="numberedAction" aria-label="Operacja">
+              <option value="predkosc" selected>Prędkość</option><option value="off">Wyłącz</option>
+            </select>
+            <select id="numberedSpeed" aria-label="Prędkość urządzeń">
               <option>10</option><option>20</option><option>30</option><option>40</option><option>50</option>
               <option>60</option><option selected>70</option><option>80</option><option>90</option><option>100</option>
             </select>
-            <button id="sendBalloonSequence" class="button primary" type="button">Wyślij</button>
+            <button id="sendNumberedSequence" class="button primary" type="button">Wyślij</button>
           </div>
         </article>
         <article class="sector-sequence-card">
-          <code id="sectorRoutePreview">/makieta/slupy/sektor/3/on</code>
-          <p>Czyści wybór, wybiera dokładnie jeden sektor, a następnie stosuje go do wybranego elementu.</p>
+          <code id="sectorRoutePreview">/makieta/slupy/sektory/1-3/on</code>
+          <p>Czyści wybór, wybiera pojedynczy sektor albo domknięty zakres, a następnie stosuje go do elementu.</p>
           <span>Zakres sektorów jest automatycznie ograniczony zgodnie z protokołem.</span>
           <div class="sequence-actions">
             <select id="sectorDevice" aria-label="Element sektorowy">
-              <option value="/makieta/slupy" data-max-sector="7">Słupy HV [1-7]</option>
+              <option value="/makieta/slupy" data-max-sector="6">Słupy HV [1-6]</option>
               <option value="/makieta/balony/led" data-max-sector="3">LED-y na balonach [1-3]</option>
               <option value="/makieta/zabudowa-mieszkaniowa/0" data-max-sector="3">Zabudowa mieszkaniowa 0 [1-3]</option>
               <option value="/makieta/budynek/1" data-max-sector="6">Budynek 1 [1-6]</option>
@@ -69,10 +81,15 @@
               <option value="/makieta/farma-fotowoltaiczna/1/rgb" data-max-sector="3">Farma fotowoltaiczna 1 RGB [1-3]</option>
               <option value="/makieta/magazyn-energii/rgb" data-max-sector="2">Magazyn energii RGB [1-2]</option>
             </select>
-            <select id="sectorNumber" aria-label="Numer sektora">
-              <option value="1">Sektor 1</option><option value="2">Sektor 2</option><option value="3" selected>Sektor 3</option>
-              <option value="4">Sektor 4</option><option value="5">Sektor 5</option><option value="6">Sektor 6</option>
-              <option value="7">Sektor 7</option><option value="8">Sektor 8</option>
+            <select id="sectorFrom" aria-label="Pierwszy sektor">
+              <option value="1" selected>Od 1</option><option value="2">Od 2</option><option value="3">Od 3</option>
+              <option value="4">Od 4</option><option value="5">Od 5</option><option value="6">Od 6</option>
+              <option value="7">Od 7</option><option value="8">Od 8</option>
+            </select>
+            <select id="sectorTo" aria-label="Ostatni sektor">
+              <option value="1">Do 1</option><option value="2">Do 2</option><option value="3" selected>Do 3</option>
+              <option value="4">Do 4</option><option value="5">Do 5</option><option value="6">Do 6</option>
+              <option value="7">Do 7</option><option value="8">Do 8</option>
             </select>
             <button id="sendSectorSequence" class="button primary" type="button">Wyślij</button>
           </div>

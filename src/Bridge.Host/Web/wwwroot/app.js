@@ -11,11 +11,16 @@ const elements = {
   oscStatus: document.querySelector('#oscStatus'),
   oscDetails: document.querySelector('#oscDetails'),
   oscPing: document.querySelector('#oscPing'),
-  balloonNumber: document.querySelector('#balloonNumber'),
-  balloonSpeed: document.querySelector('#balloonSpeed'),
-  sendBalloonSequence: document.querySelector('#sendBalloonSequence'),
+  numberedDevice: document.querySelector('#numberedDevice'),
+  numberedFrom: document.querySelector('#numberedFrom'),
+  numberedTo: document.querySelector('#numberedTo'),
+  numberedAction: document.querySelector('#numberedAction'),
+  numberedSpeed: document.querySelector('#numberedSpeed'),
+  numberedRoutePreview: document.querySelector('#numberedRoutePreview'),
+  sendNumberedSequence: document.querySelector('#sendNumberedSequence'),
   sectorDevice: document.querySelector('#sectorDevice'),
-  sectorNumber: document.querySelector('#sectorNumber'),
+  sectorFrom: document.querySelector('#sectorFrom'),
+  sectorTo: document.querySelector('#sectorTo'),
   sectorRoutePreview: document.querySelector('#sectorRoutePreview'),
   sendSectorSequence: document.querySelector('#sendSectorSequence'),
   searchInput: document.querySelector('#searchInput'),
@@ -195,14 +200,55 @@ async function sendOscModel(address) {
 function updateSectorSequence() {
   const selectedDevice = elements.sectorDevice.selectedOptions[0];
   const maxSector = Number(selectedDevice.dataset.maxSector);
-  for (const option of elements.sectorNumber.options) {
-    option.disabled = Number(option.value) > maxSector;
+  for (const select of [elements.sectorFrom, elements.sectorTo]) {
+    for (const option of select.options) {
+      option.disabled = Number(option.value) > maxSector;
+    }
   }
-  if (Number(elements.sectorNumber.value) > maxSector) {
-    elements.sectorNumber.value = String(maxSector);
+  if (Number(elements.sectorFrom.value) > maxSector) {
+    elements.sectorFrom.value = String(maxSector);
   }
-  elements.sectorRoutePreview.textContent =
-    `${elements.sectorDevice.value}/sektor/${elements.sectorNumber.value}/on`;
+  if (Number(elements.sectorTo.value) > maxSector) {
+    elements.sectorTo.value = String(maxSector);
+  }
+  if (Number(elements.sectorTo.value) < Number(elements.sectorFrom.value)) {
+    elements.sectorTo.value = elements.sectorFrom.value;
+  }
+
+  const first = elements.sectorFrom.value;
+  const last = elements.sectorTo.value;
+  elements.sectorRoutePreview.textContent = first === last
+    ? `${elements.sectorDevice.value}/sektor/${first}/on`
+    : `${elements.sectorDevice.value}/sektory/${first}-${last}/on`;
+}
+
+function updateNumberedSequence() {
+  const selectedDevice = elements.numberedDevice.selectedOptions[0];
+  const maxItem = Number(selectedDevice.dataset.maxItem);
+  for (const select of [elements.numberedFrom, elements.numberedTo]) {
+    for (const option of select.options) {
+      option.disabled = Number(option.value) > maxItem;
+    }
+  }
+  if (Number(elements.numberedFrom.value) > maxItem) {
+    elements.numberedFrom.value = String(maxItem);
+  }
+  if (Number(elements.numberedTo.value) > maxItem) {
+    elements.numberedTo.value = String(maxItem);
+  }
+  if (Number(elements.numberedTo.value) < Number(elements.numberedFrom.value)) {
+    elements.numberedTo.value = elements.numberedFrom.value;
+  }
+
+  const first = elements.numberedFrom.value;
+  const last = elements.numberedTo.value;
+  const baseAddress = first === last ? selectedDevice.dataset.singleAddress : selectedDevice.value;
+  const itemPart = first === last ? first : `${first}-${last}`;
+  const actionPart = elements.numberedAction.value === 'off'
+    ? 'off'
+    : `predkosc/${elements.numberedSpeed.value}`;
+  elements.numberedSpeed.disabled = elements.numberedAction.value === 'off';
+  elements.numberedRoutePreview.textContent = `${baseAddress}/${itemPart}/${actionPart}`;
 }
 
 function showToast(message, error = false) {
@@ -235,12 +281,15 @@ elements.channelFilter.addEventListener('change', renderLogs);
 elements.pauseLogs.addEventListener('change', () => { if (!elements.pauseLogs.checked) renderLogs(); });
 elements.clearLogs.addEventListener('click', clearLogs);
 elements.oscPing.addEventListener('click', testOsc);
-elements.sendBalloonSequence.addEventListener('click', () =>
-  sendOscModel(`/makieta/balon/${elements.balloonNumber.value}/predkosc/${elements.balloonSpeed.value}`));
+for (const element of [elements.numberedDevice, elements.numberedFrom, elements.numberedTo, elements.numberedAction, elements.numberedSpeed]) {
+  element.addEventListener('change', updateNumberedSequence);
+}
+elements.sendNumberedSequence.addEventListener('click', () => sendOscModel(elements.numberedRoutePreview.textContent));
 elements.sectorDevice.addEventListener('change', updateSectorSequence);
-elements.sectorNumber.addEventListener('change', updateSectorSequence);
-elements.sendSectorSequence.addEventListener('click', () =>
-  sendOscModel(`${elements.sectorDevice.value}/sektor/${elements.sectorNumber.value}/on`));
+elements.sectorFrom.addEventListener('change', updateSectorSequence);
+elements.sectorTo.addEventListener('change', updateSectorSequence);
+elements.sendSectorSequence.addEventListener('click', () => sendOscModel(elements.sectorRoutePreview.textContent));
+updateNumberedSequence();
 updateSectorSequence();
 
 Promise.all([loadCommands(), refreshStatus(), refreshLogs()]).catch(error => showToast(error.message, true));

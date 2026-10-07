@@ -57,7 +57,7 @@ public static class ModelCommandCatalog
             "Komenda ON stosuje globalny wybór z 0x50-0x59; pusty wybór wyłącza wszystkie sektory.";
 
         Set(commands, 0x20, "Słupy HV off", "Słupy i sektory");
-        Set(commands, 0x21, "Słupy HV: zastosuj wybór sektorów [1-7]", "Słupy i sektory", wire: "S1-S7", note: sectorSelectionNote);
+        Set(commands, 0x21, "Słupy HV: zastosuj wybór sektorów [1-6]", "Słupy i sektory", wire: "S1-S6", note: sectorSelectionNote);
         Set(commands, 0x22, "LED-y na balonach off", "Balony", wire: "EE EF EG");
         Set(commands, 0x23, "LED-y na balonach: zastosuj wybór sektorów [1-3]", "Balony", note: sectorSelectionNote);
         Set(commands, 0x24, "InPost LED off", "Obiekty", wire: "INPOST");
