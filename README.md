@@ -166,6 +166,24 @@ Pierwsza sekwencja wysyła wartość `70%` (`0x16`), czeka na ACK `0x96`, a pote
 uruchamia balon 2 (`0x1D`). Druga czyści wybór sektorów (`0x59`), wybiera sektor
 3 (`0x53`) i stosuje wybór do słupów (`0x21`). Każdy krok czeka na własny ACK.
 
+Ten sam mechanizm działa dla wszystkich urządzeń sektorowych:
+
+| Element | Zakres | Ścieżka OSC |
+| --- | ---: | --- |
+| Słupy HV | 1–7 | `/makieta/slupy/sektor/{sektor}/on` |
+| LED-y na balonach | 1–3 | `/makieta/balony/led/sektor/{sektor}/on` |
+| Zabudowa mieszkaniowa 0 | 1–3 | `/makieta/zabudowa-mieszkaniowa/0/sektor/{sektor}/on` |
+| Budynek 1 | 1–6 | `/makieta/budynek/1/sektor/{sektor}/on` |
+| Budynek 2 | 1–7 | `/makieta/budynek/2/sektor/{sektor}/on` |
+| Budynek 3 | 1–8 | `/makieta/budynek/3/sektor/{sektor}/on` |
+| Hotel 1 | 1–3 | `/makieta/hotel/1/sektor/{sektor}/on` |
+| Zabudowa mieszkaniowa 1 | 1–3 | `/makieta/zabudowa-mieszkaniowa/1/sektor/{sektor}/on` |
+| Farma fotowoltaiczna 1 RGB | 1–3 | `/makieta/farma-fotowoltaiczna/1/rgb/sektor/{sektor}/on` |
+| Magazyn energii RGB | 1–2 | `/makieta/magazyn-energii/rgb/sektor/{sektor}/on` |
+
+Panel WWW udostępnia wspólną listę urządzeń i automatycznie ogranicza dostępne
+numery sektorów do zakresu wybranego elementu.
+
 Wybór sektorów jest globalny dla elementów opisanych zakresami w nawiasach:
 
 - `0x50` wybiera wszystkie sektory;

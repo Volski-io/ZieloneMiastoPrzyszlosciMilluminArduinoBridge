@@ -14,8 +14,10 @@ const elements = {
   balloonNumber: document.querySelector('#balloonNumber'),
   balloonSpeed: document.querySelector('#balloonSpeed'),
   sendBalloonSequence: document.querySelector('#sendBalloonSequence'),
-  poleSector: document.querySelector('#poleSector'),
-  sendPoleSequence: document.querySelector('#sendPoleSequence'),
+  sectorDevice: document.querySelector('#sectorDevice'),
+  sectorNumber: document.querySelector('#sectorNumber'),
+  sectorRoutePreview: document.querySelector('#sectorRoutePreview'),
+  sendSectorSequence: document.querySelector('#sendSectorSequence'),
   searchInput: document.querySelector('#searchInput'),
   categoryFilter: document.querySelector('#categoryFilter'),
   customHex: document.querySelector('#customHex'),
@@ -190,6 +192,19 @@ async function sendOscModel(address) {
   }
 }
 
+function updateSectorSequence() {
+  const selectedDevice = elements.sectorDevice.selectedOptions[0];
+  const maxSector = Number(selectedDevice.dataset.maxSector);
+  for (const option of elements.sectorNumber.options) {
+    option.disabled = Number(option.value) > maxSector;
+  }
+  if (Number(elements.sectorNumber.value) > maxSector) {
+    elements.sectorNumber.value = String(maxSector);
+  }
+  elements.sectorRoutePreview.textContent =
+    `${elements.sectorDevice.value}/sektor/${elements.sectorNumber.value}/on`;
+}
+
 function showToast(message, error = false) {
   clearTimeout(state.toastTimer);
   elements.toast.textContent = message;
@@ -222,8 +237,11 @@ elements.clearLogs.addEventListener('click', clearLogs);
 elements.oscPing.addEventListener('click', testOsc);
 elements.sendBalloonSequence.addEventListener('click', () =>
   sendOscModel(`/makieta/balon/${elements.balloonNumber.value}/predkosc/${elements.balloonSpeed.value}`));
-elements.sendPoleSequence.addEventListener('click', () =>
-  sendOscModel(`/makieta/slupy/sektor/${elements.poleSector.value}/on`));
+elements.sectorDevice.addEventListener('change', updateSectorSequence);
+elements.sectorNumber.addEventListener('change', updateSectorSequence);
+elements.sendSectorSequence.addEventListener('click', () =>
+  sendOscModel(`${elements.sectorDevice.value}/sektor/${elements.sectorNumber.value}/on`));
+updateSectorSequence();
 
 Promise.all([loadCommands(), refreshStatus(), refreshLogs()]).catch(error => showToast(error.message, true));
 setInterval(refreshStatus, 1500);

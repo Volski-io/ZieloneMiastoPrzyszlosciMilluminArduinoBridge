@@ -18,7 +18,7 @@ public static class Program
         ("OSC codec round-trips supported values", TestOscRoundTripAsync),
         ("Readable OSC command address sends a UART frame", TestOscModelCommandAsync),
         ("Parameterized balloon OSC queues speed then start", TestOscBalloonSequenceAsync),
-        ("Parameterized pole OSC clears, selects and applies sector", TestOscPoleSequenceAsync),
+        ("Parameterized sector OSC covers every sector-based device", TestOscSectorSequencesAsync),
         ("Coordinator ACKs and launches a scenario", TestCoordinatorScenarioAsync),
         ("Coordinator restores persisted state after OSC reconnect", TestCoordinatorRestoreAsync)
     ];
@@ -162,7 +162,38 @@ public static class Program
         await runTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
     }
 
-    private static async Task TestOscPoleSequenceAsync()
+    private static async Task TestOscSectorSequencesAsync()
+    {
+        var validator = new BridgeCoordinator(
+            new FakeSerialTransport(),
+            new FakeOscTransport(),
+            new MemoryStateStore(),
+            new TestLog(),
+            FastOptions());
+        True(!validator.TryQueueOscModelCommand("/makieta/magazyn-energii/rgb/sektor/3/on"));
+        True(!validator.TryQueueOscModelCommand("/makieta/budynek/1/sektor/7/on"));
+
+        (string Address, int Sector, byte OnCommand)[] routes =
+        [
+            ("/makieta/slupy/sektor/7/on", 7, 0x21),
+            ("/makieta/balony/led/sektor/3/on", 3, 0x23),
+            ("/makieta/zabudowa-mieszkaniowa/0/sektor/3/on", 3, 0x5F),
+            ("/makieta/budynek/1/sektor/6/on", 6, 0x61),
+            ("/makieta/budynek/2/sektor/7/on", 7, 0x63),
+            ("/makieta/budynek/3/sektor/8/on", 8, 0x65),
+            ("/makieta/hotel/1/sektor/3/on", 3, 0x67),
+            ("/makieta/zabudowa-mieszkaniowa/1/sektor/3/on", 3, 0x6B),
+            ("/makieta/farma-fotowoltaiczna/1/rgb/sektor/3/on", 3, 0x6F),
+            ("/makieta/magazyn-energii/rgb/sektor/2/on", 2, 0x73)
+        ];
+
+        foreach (var route in routes)
+        {
+            await AssertSectorSequenceAsync(route.Address, route.Sector, route.OnCommand);
+        }
+    }
+
+    private static async Task AssertSectorSequenceAsync(string address, int sector, byte onCommand)
     {
         var serial = new FakeSerialTransport();
         var osc = new FakeOscTransport();
@@ -170,16 +201,17 @@ public static class Program
         using var cancellation = new CancellationTokenSource();
         var runTask = coordinator.RunAsync(cancellation.Token);
 
-        osc.Emit(new OscMessage("/makieta/slupy/sektor/3/on"));
+        var selectionCommand = (byte)(0x50 + sector);
+        osc.Emit(new OscMessage(address));
         await WaitUntilAsync(() => ContainsFrame(serial, 0x59));
         serial.Emit(ModelFrameCodec.Encode(0xD9));
-        await WaitUntilAsync(() => ContainsFrame(serial, 0x53));
-        serial.Emit(ModelFrameCodec.Encode(0xD3));
-        await WaitUntilAsync(() => ContainsFrame(serial, 0x21));
+        await WaitUntilAsync(() => ContainsFrame(serial, selectionCommand));
+        serial.Emit(ModelFrameCodec.Encode((byte)(selectionCommand | 0x80)));
+        await WaitUntilAsync(() => ContainsFrame(serial, onCommand));
 
         var sent = serial.Sent.ToArray();
-        True(IndexOfFrame(sent, 0x59) < IndexOfFrame(sent, 0x53));
-        True(IndexOfFrame(sent, 0x53) < IndexOfFrame(sent, 0x21));
+        True(IndexOfFrame(sent, 0x59) < IndexOfFrame(sent, selectionCommand));
+        True(IndexOfFrame(sent, selectionCommand) < IndexOfFrame(sent, onCommand));
 
         cancellation.Cancel();
         await runTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);

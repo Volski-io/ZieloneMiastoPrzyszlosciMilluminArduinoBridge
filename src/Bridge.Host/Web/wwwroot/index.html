@@ -52,16 +52,29 @@
             <button id="sendBalloonSequence" class="button primary" type="button">Wyślij</button>
           </div>
         </article>
-        <article>
-          <code>/makieta/slupy/sektor/{1-7}/on</code>
-          <p>Czyści wybór, wybiera dokładnie jeden sektor, a następnie stosuje wybór do słupów.</p>
-          <span>Przykład: <code>/makieta/slupy/sektor/3/on</code></span>
+        <article class="sector-sequence-card">
+          <code id="sectorRoutePreview">/makieta/slupy/sektor/3/on</code>
+          <p>Czyści wybór, wybiera dokładnie jeden sektor, a następnie stosuje go do wybranego elementu.</p>
+          <span>Zakres sektorów jest automatycznie ograniczony zgodnie z protokołem.</span>
           <div class="sequence-actions">
-            <select id="poleSector" aria-label="Sektor słupów">
-              <option value="1">Sektor 1</option><option value="2">Sektor 2</option><option value="3" selected>Sektor 3</option>
-              <option value="4">Sektor 4</option><option value="5">Sektor 5</option><option value="6">Sektor 6</option><option value="7">Sektor 7</option>
+            <select id="sectorDevice" aria-label="Element sektorowy">
+              <option value="/makieta/slupy" data-max-sector="7">Słupy HV [1-7]</option>
+              <option value="/makieta/balony/led" data-max-sector="3">LED-y na balonach [1-3]</option>
+              <option value="/makieta/zabudowa-mieszkaniowa/0" data-max-sector="3">Zabudowa mieszkaniowa 0 [1-3]</option>
+              <option value="/makieta/budynek/1" data-max-sector="6">Budynek 1 [1-6]</option>
+              <option value="/makieta/budynek/2" data-max-sector="7">Budynek 2 [1-7]</option>
+              <option value="/makieta/budynek/3" data-max-sector="8">Budynek 3 [1-8]</option>
+              <option value="/makieta/hotel/1" data-max-sector="3">Hotel 1 [1-3]</option>
+              <option value="/makieta/zabudowa-mieszkaniowa/1" data-max-sector="3">Zabudowa mieszkaniowa 1 [1-3]</option>
+              <option value="/makieta/farma-fotowoltaiczna/1/rgb" data-max-sector="3">Farma fotowoltaiczna 1 RGB [1-3]</option>
+              <option value="/makieta/magazyn-energii/rgb" data-max-sector="2">Magazyn energii RGB [1-2]</option>
             </select>
-            <button id="sendPoleSequence" class="button primary" type="button">Wyślij</button>
+            <select id="sectorNumber" aria-label="Numer sektora">
+              <option value="1">Sektor 1</option><option value="2">Sektor 2</option><option value="3" selected>Sektor 3</option>
+              <option value="4">Sektor 4</option><option value="5">Sektor 5</option><option value="6">Sektor 6</option>
+              <option value="7">Sektor 7</option><option value="8">Sektor 8</option>
+            </select>
+            <button id="sendSectorSequence" class="button primary" type="button">Wyślij</button>
           </div>
         </article>
         <article>

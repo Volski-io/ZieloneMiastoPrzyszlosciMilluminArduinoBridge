@@ -18,6 +18,20 @@ public sealed class BridgeCoordinator
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
     private readonly Dictionary<byte, DateTimeOffset> _lastInputAt = [];
     private readonly Queue<byte> _modelOutputQueue = [];
+    private static readonly IReadOnlyDictionary<string, SectorOscTarget> SectorOscTargets =
+        new Dictionary<string, SectorOscTarget>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["/makieta/slupy"] = new(7, 0x21),
+            ["/makieta/balony/led"] = new(3, 0x23),
+            ["/makieta/zabudowa-mieszkaniowa/0"] = new(3, 0x5F),
+            ["/makieta/budynek/1"] = new(6, 0x61),
+            ["/makieta/budynek/2"] = new(7, 0x63),
+            ["/makieta/budynek/3"] = new(8, 0x65),
+            ["/makieta/hotel/1"] = new(3, 0x67),
+            ["/makieta/zabudowa-mieszkaniowa/1"] = new(3, 0x6B),
+            ["/makieta/farma-fotowoltaiczna/1/rgb"] = new(3, 0x6F),
+            ["/makieta/magazyn-energii/rgb"] = new(2, 0x73)
+        };
 
     private BridgeState _state = new();
     private PendingModelCommand? _pendingModelCommand;
@@ -313,25 +327,8 @@ public sealed class BridgeCoordinator
             return true;
         }
 
-        if (segments.Length == 5 &&
-            segments[0].Equals("makieta", StringComparison.OrdinalIgnoreCase) &&
-            segments[1].Equals("slupy", StringComparison.OrdinalIgnoreCase) &&
-            segments[2].Equals("sektor", StringComparison.OrdinalIgnoreCase) &&
-            segments[4].Equals("on", StringComparison.OrdinalIgnoreCase))
+        if (TryReadSectorSequence(segments, out commands))
         {
-            if (int.TryParse(segments[3], NumberStyles.None, CultureInfo.InvariantCulture, out var sector) &&
-                sector is >= 1 and <= 7)
-            {
-                commands =
-                [
-                    ModelProtocolConstants.ClearSectorSelection,
-                    (byte)(ModelProtocolConstants.ToggleSector1 + sector - 1),
-                    ModelProtocolConstants.PolesApplySectorSelection
-                ];
-                return true;
-            }
-
-            commands = [];
             return true;
         }
 
@@ -375,6 +372,36 @@ public sealed class BridgeCoordinator
                 commands = [];
                 return true;
         }
+    }
+
+    private static bool TryReadSectorSequence(string[] segments, out IReadOnlyList<byte> commands)
+    {
+        commands = [];
+        if (segments.Length < 5 ||
+            !segments[^3].Equals("sektor", StringComparison.OrdinalIgnoreCase) ||
+            !segments[^1].Equals("on", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var deviceAddress = "/" + string.Join('/', segments[..^3]);
+        if (!SectorOscTargets.TryGetValue(deviceAddress, out var target))
+        {
+            return false;
+        }
+
+        if (int.TryParse(segments[^2], NumberStyles.None, CultureInfo.InvariantCulture, out var sector) &&
+            sector >= 1 && sector <= target.MaxSector)
+        {
+            commands =
+            [
+                ModelProtocolConstants.ClearSectorSelection,
+                (byte)(ModelProtocolConstants.ToggleSector1 + sector - 1),
+                target.OnCommand
+            ];
+        }
+
+        return true;
     }
 
     private async Task HandleTickAsync(DateTimeOffset now, CancellationToken cancellationToken)
@@ -568,4 +595,6 @@ public sealed class BridgeCoordinator
         DateTimeOffset StartedAt,
         DateTimeOffset NextAttemptAt,
         int Attempts);
+
+    private sealed record SectorOscTarget(int MaxSector, byte OnCommand);
 }

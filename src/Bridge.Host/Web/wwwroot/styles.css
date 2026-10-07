@@ -99,6 +99,8 @@ main { display: grid; gap: 18px; padding-bottom: 48px; }
 .sequence-grid span { color: var(--muted); font-size: 12px; line-height: 1.45; }
 .sequence-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .sequence-actions select { min-width: 100px; flex: 1; }
+.sector-sequence-card { grid-column: span 2; }
+.sector-sequence-card #sectorDevice { min-width: 260px; }
 
 .toolbar {
   display: flex;
@@ -199,6 +201,7 @@ tr.reserved { opacity: .58; }
 @media (max-width: 900px) {
   .topbar { align-items: stretch; flex-direction: column; }
   .sequence-grid { grid-template-columns: 1fr; }
+  .sector-sequence-card { grid-column: auto; }
   .toolbar { align-items: stretch; flex-direction: column; }
   .field, .compact-field { width: 100%; }
   .section-heading, .log-heading { align-items: stretch; flex-direction: column; }
