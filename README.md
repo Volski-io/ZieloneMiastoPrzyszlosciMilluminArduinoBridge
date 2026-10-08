@@ -166,16 +166,17 @@ Bridge obsługuje także parametryzowane sekwencje:
 /makieta/balon/2/predkosc/70
 /makieta/wiatraki/1-5/predkosc/70
 /makieta/obiekty/chmura-pompka/predkosc/40
+/makieta/transport/pociag/predkosc/40
 /makieta/slupy/sektor/3/on
 /makieta/slupy/sektory/2-6/on
 ```
 
 Pierwsza sekwencja wysyła wartość `70%` (`0x16`), czeka na ACK `0x96`, a potem
 uruchamia balon 2 (`0x1D`). Druga ustawia `70%` raz i uruchamia pięć wiatraków.
-Trzecia ustawia `40%` (`0x13`) i uruchamia pompkę chmury (`0x4F`). Czwarta
-czyści wybór sektorów (`0x59`), wybiera sektor 3 (`0x53`) i stosuje wybór do
-słupów (`0x21`). Piąta robi to samo dla całego domkniętego zakresu. Każdy krok
-czeka na własny ACK.
+Trzecia ustawia `40%` (`0x13`) i uruchamia pompkę chmury (`0x4F`), a czwarta
+z tą samą prędkością uruchamia pociąg (`0x4B`). Piąta czyści wybór sektorów
+(`0x59`), wybiera sektor 3 (`0x53`) i stosuje wybór do słupów (`0x21`). Szósta
+robi to samo dla całego domkniętego zakresu. Każdy krok czeka na własny ACK.
 
 Numerowane wiatraki i balony obsługują komendy pojedyncze oraz zakresowe:
 
@@ -196,6 +197,9 @@ Pompka chmury obsługuje analogiczną komendę
 `/makieta/obiekty/chmura-pompka/predkosc/{10-100}`. Bridge ustawia aktywną
 wartość, czeka na ACK i dopiero wtedy uruchamia pompkę.
 
+Pociąg obsługuje komendę `/makieta/transport/pociag/predkosc/{10-100}` według
+tej samej zasady: aktywna wartość, ACK, a następnie uruchomienie pociągu.
+
 Ten sam mechanizm działa dla wszystkich urządzeń sektorowych:
 
 | Element | Zakres | Ścieżka OSC |
@@ -211,9 +215,9 @@ Ten sam mechanizm działa dla wszystkich urządzeń sektorowych:
 | Farma fotowoltaiczna 1 RGB | 1–3 | `/makieta/farma-fotowoltaiczna/1/rgb/sektor/{sektor}/on` |
 | Magazyn energii RGB | 1–2 | `/makieta/magazyn-energii/rgb/sektor/{sektor}/on` |
 
-Panel WWW udostępnia osobne sterowanie prędkością pompki chmury, wspólną listę
-urządzeń sektorowych i automatycznie ogranicza dostępne numery sektorów do
-zakresu wybranego elementu.
+Panel WWW udostępnia osobne sterowanie prędkością pompki chmury i pociągu,
+wspólną listę urządzeń sektorowych i automatycznie ogranicza dostępne numery
+sektorów do zakresu wybranego elementu.
 
 Każdy element sektorowy z tabeli obsługuje również zakres:
 

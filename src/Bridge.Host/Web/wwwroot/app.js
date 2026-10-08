@@ -21,6 +21,9 @@ const elements = {
   pumpSpeed: document.querySelector('#pumpSpeed'),
   pumpRoutePreview: document.querySelector('#pumpRoutePreview'),
   sendPumpSequence: document.querySelector('#sendPumpSequence'),
+  trainSpeed: document.querySelector('#trainSpeed'),
+  trainRoutePreview: document.querySelector('#trainRoutePreview'),
+  sendTrainSequence: document.querySelector('#sendTrainSequence'),
   sectorDevice: document.querySelector('#sectorDevice'),
   sectorFrom: document.querySelector('#sectorFrom'),
   sectorTo: document.querySelector('#sectorTo'),
@@ -258,6 +261,10 @@ function updatePumpSequence() {
   elements.pumpRoutePreview.textContent = `/makieta/obiekty/chmura-pompka/predkosc/${elements.pumpSpeed.value}`;
 }
 
+function updateTrainSequence() {
+  elements.trainRoutePreview.textContent = `/makieta/transport/pociag/predkosc/${elements.trainSpeed.value}`;
+}
+
 function showToast(message, error = false) {
   clearTimeout(state.toastTimer);
   elements.toast.textContent = message;
@@ -294,12 +301,15 @@ for (const element of [elements.numberedDevice, elements.numberedFrom, elements.
 elements.sendNumberedSequence.addEventListener('click', () => sendOscModel(elements.numberedRoutePreview.textContent));
 elements.pumpSpeed.addEventListener('change', updatePumpSequence);
 elements.sendPumpSequence.addEventListener('click', () => sendOscModel(elements.pumpRoutePreview.textContent));
+elements.trainSpeed.addEventListener('change', updateTrainSequence);
+elements.sendTrainSequence.addEventListener('click', () => sendOscModel(elements.trainRoutePreview.textContent));
 elements.sectorDevice.addEventListener('change', updateSectorSequence);
 elements.sectorFrom.addEventListener('change', updateSectorSequence);
 elements.sectorTo.addEventListener('change', updateSectorSequence);
 elements.sendSectorSequence.addEventListener('click', () => sendOscModel(elements.sectorRoutePreview.textContent));
 updateNumberedSequence();
 updatePumpSequence();
+updateTrainSequence();
 updateSectorSequence();
 
 Promise.all([loadCommands(), refreshStatus(), refreshLogs()]).catch(error => showToast(error.message, true));

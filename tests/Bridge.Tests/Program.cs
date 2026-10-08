@@ -155,6 +155,9 @@ public static class Program
         await AssertCommandSequenceAsync("/makieta/obiekty/chmura-pompka/predkosc/10", [0x10, 0x4F]);
         await AssertCommandSequenceAsync("/makieta/obiekty/chmura-pompka/predkosc/40", [0x13, 0x4F]);
         await AssertCommandSequenceAsync("/makieta/obiekty/chmura-pompka/predkosc/100", [0x19, 0x4F]);
+        await AssertCommandSequenceAsync("/makieta/transport/pociag/predkosc/10", [0x10, 0x4B]);
+        await AssertCommandSequenceAsync("/makieta/transport/pociag/predkosc/40", [0x13, 0x4B]);
+        await AssertCommandSequenceAsync("/makieta/transport/pociag/predkosc/100", [0x19, 0x4B]);
 
         var validator = new BridgeCoordinator(
             new FakeSerialTransport(),
@@ -163,6 +166,7 @@ public static class Program
             new TestLog(),
             FastOptions());
         True(!validator.TryQueueOscModelCommand("/makieta/obiekty/chmura-pompka/predkosc/45"));
+        True(!validator.TryQueueOscModelCommand("/makieta/transport/pociag/predkosc/45"));
     }
 
     private static async Task TestOscNumberedRangesAsync()

@@ -307,7 +307,7 @@ public sealed class BridgeCoordinator
         }
 
         var segments = message.Address.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (TryReadPumpSpeedSequence(segments, out commands))
+        if (TryReadSingleDeviceSpeedSequence(segments, out commands))
         {
             return true;
         }
@@ -364,14 +364,28 @@ public sealed class BridgeCoordinator
         }
     }
 
-    private static bool TryReadPumpSpeedSequence(string[] segments, out IReadOnlyList<byte> commands)
+    private static bool TryReadSingleDeviceSpeedSequence(string[] segments, out IReadOnlyList<byte> commands)
     {
         commands = [];
         if (segments.Length != 5 ||
             !segments[0].Equals("makieta", StringComparison.OrdinalIgnoreCase) ||
-            !segments[1].Equals("obiekty", StringComparison.OrdinalIgnoreCase) ||
-            !segments[2].Equals("chmura-pompka", StringComparison.OrdinalIgnoreCase) ||
             !segments[3].Equals("predkosc", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        byte startCommand;
+        if (segments[1].Equals("obiekty", StringComparison.OrdinalIgnoreCase) &&
+            segments[2].Equals("chmura-pompka", StringComparison.OrdinalIgnoreCase))
+        {
+            startCommand = 0x4F;
+        }
+        else if (segments[1].Equals("transport", StringComparison.OrdinalIgnoreCase) &&
+                 segments[2].Equals("pociag", StringComparison.OrdinalIgnoreCase))
+        {
+            startCommand = 0x4B;
+        }
+        else
         {
             return false;
         }
@@ -379,7 +393,7 @@ public sealed class BridgeCoordinator
         if (int.TryParse(segments[4], NumberStyles.None, CultureInfo.InvariantCulture, out var percent) &&
             percent is >= 10 and <= 100 && percent % 10 == 0)
         {
-            commands = [(byte)(0x0F + (percent / 10)), 0x4F];
+            commands = [(byte)(0x0F + (percent / 10)), startCommand];
         }
 
         return true;
