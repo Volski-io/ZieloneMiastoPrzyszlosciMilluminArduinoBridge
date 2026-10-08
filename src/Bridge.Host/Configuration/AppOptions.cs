@@ -130,7 +130,7 @@ public sealed record LoggingOptions
 public sealed record WebOptions
 {
     public bool Enabled { get; init; } = true;
-    public string ListenUrl { get; init; } = "http://127.0.0.1:8080";
+    public string ListenUrl { get; init; } = "http://0.0.0.0:8080";
 }
 
 public sealed record ScenarioOptions

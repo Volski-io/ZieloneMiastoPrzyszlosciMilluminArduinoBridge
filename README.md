@@ -130,16 +130,17 @@ Panel testowy jest dostępny lokalnie pod adresem:
 http://127.0.0.1:8080
 ```
 
-Aby udostępnić panel innym urządzeniom w sieci lokalnej, ustaw `Web.ListenUrl` na
-`http://0.0.0.0:8080`, a następnie uruchom jako Administrator:
+Domyślna konfiguracja nasłuchuje na `http://0.0.0.0:8080`, więc panel jest też
+dostępny z innych urządzeń w sieci lokalnej pod adresem IP komputera z bridgem,
+np. `http://192.168.50.197:8080`. Na Windows uruchom jako Administrator:
 
 ```powershell
 .\scripts\open-windows-firewall.ps1
 ```
 
 Reguły zapory dopuszczają TCP `8080` i feedback OSC UDP `5001` wyłącznie z
-lokalnej podsieci. Panel otwiera się wtedy pod adresem IP komputera z bridgem,
-np. `http://192.168.50.197:8080`.
+lokalnej podsieci. Na macOS zezwól aplikacji `millumin-bridge` na połączenia
+przychodzące w ustawieniach firewalla. Nie wystawiaj portu `8080` do Internetu.
 
 Panel zawiera wszystkie wartości DATA `0x00–0xFF`, opis funkcji, gotową ramkę z CRC, oczekiwany ACK i odpowiadające wywołanie OSC. Rejestruje ramki UART i pakiety OSC w obu kierunkach, pokazując tłumaczenie oraz surowe bajty.
 
@@ -151,6 +152,10 @@ feedback bridge'a, domyślnie UDP `5001`. Przykładowo:
 /makieta/scenariusz/1/uruchom
 ```
 
+Adresy OSC używają wyłącznie znaków ASCII. Polskie znaki w nazwach urządzeń są
+transliterowane, np. `Elektrownia Złotniki` ma adres
+`/makieta/obiekty/elektrownia-zlotniki-on`.
+
 Pierwszy adres wysyła DATA `0x54`, czyli ramkę `29 54 AB`. Drugi uruchamia
 scenariusz 1 komendą DATA `0x78`. Pełna lista adresów znajduje się w panelu
 testowym obok każdej komendy.
@@ -160,15 +165,17 @@ Bridge obsługuje także parametryzowane sekwencje:
 ```text
 /makieta/balon/2/predkosc/70
 /makieta/wiatraki/1-5/predkosc/70
+/makieta/obiekty/chmura-pompka/predkosc/40
 /makieta/slupy/sektor/3/on
 /makieta/slupy/sektory/2-6/on
 ```
 
 Pierwsza sekwencja wysyła wartość `70%` (`0x16`), czeka na ACK `0x96`, a potem
 uruchamia balon 2 (`0x1D`). Druga ustawia `70%` raz i uruchamia pięć wiatraków.
-Trzecia czyści wybór sektorów (`0x59`), wybiera sektor 3 (`0x53`) i stosuje
-wybór do słupów (`0x21`). Czwarta robi to samo dla całego domkniętego zakresu.
-Każdy krok czeka na własny ACK.
+Trzecia ustawia `40%` (`0x13`) i uruchamia pompkę chmury (`0x4F`). Czwarta
+czyści wybór sektorów (`0x59`), wybiera sektor 3 (`0x53`) i stosuje wybór do
+słupów (`0x21`). Piąta robi to samo dla całego domkniętego zakresu. Każdy krok
+czeka na własny ACK.
 
 Numerowane wiatraki i balony obsługują komendy pojedyncze oraz zakresowe:
 
@@ -185,6 +192,10 @@ Prędkość musi być wielokrotnością `10%`. Zakres jest domknięty, rosnący 
 zawierać co najmniej dwa elementy. Bridge ustawia aktywną wartość tylko raz, a
 następnie uruchamia po kolei wszystkie urządzenia z zakresu.
 
+Pompka chmury obsługuje analogiczną komendę
+`/makieta/obiekty/chmura-pompka/predkosc/{10-100}`. Bridge ustawia aktywną
+wartość, czeka na ACK i dopiero wtedy uruchamia pompkę.
+
 Ten sam mechanizm działa dla wszystkich urządzeń sektorowych:
 
 | Element | Zakres | Ścieżka OSC |
@@ -200,8 +211,9 @@ Ten sam mechanizm działa dla wszystkich urządzeń sektorowych:
 | Farma fotowoltaiczna 1 RGB | 1–3 | `/makieta/farma-fotowoltaiczna/1/rgb/sektor/{sektor}/on` |
 | Magazyn energii RGB | 1–2 | `/makieta/magazyn-energii/rgb/sektor/{sektor}/on` |
 
-Panel WWW udostępnia wspólną listę urządzeń i automatycznie ogranicza dostępne
-numery sektorów do zakresu wybranego elementu.
+Panel WWW udostępnia osobne sterowanie prędkością pompki chmury, wspólną listę
+urządzeń sektorowych i automatycznie ogranicza dostępne numery sektorów do
+zakresu wybranego elementu.
 
 Każdy element sektorowy z tabeli obsługuje również zakres:
 

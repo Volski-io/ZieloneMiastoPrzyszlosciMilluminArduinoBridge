@@ -17,7 +17,7 @@ public static class Program
         ("Command catalog covers every byte", TestCommandCatalogAsync),
         ("OSC codec round-trips supported values", TestOscRoundTripAsync),
         ("Readable OSC command address sends a UART frame", TestOscModelCommandAsync),
-        ("Parameterized fan and balloon OSC queues speed then start", TestOscSpeedSequencesAsync),
+        ("Parameterized actuator OSC queues speed then start", TestOscSpeedSequencesAsync),
         ("Parameterized fan and balloon ranges queue every element", TestOscNumberedRangesAsync),
         ("Parameterized sector OSC covers every sector-based device and range", TestOscSectorSequencesAsync),
         ("Coordinator ACKs and launches a scenario", TestCoordinatorScenarioAsync),
@@ -107,6 +107,11 @@ public static class Program
         Equal("Wyczyść wybór sektorów", ModelCommandCatalog.Get(0x59).Name);
         Equal("/makieta/sektory/wyczysc", ModelCommandCatalog.Get(0x59).OscAddress);
         Equal("Biurowiec 1 off", ModelCommandCatalog.Get(0x3C).Name);
+        Equal("/makieta/obiekty/elektrownia-zlotniki-off", ModelCommandCatalog.Get(0x76).OscAddress);
+        Equal("/makieta/obiekty/elektrownia-zlotniki-on", ModelCommandCatalog.Get(0x77).OscAddress);
+        True(ModelCommandCatalog.All
+            .Where(command => command.IsSendable && !command.IsReserved)
+            .All(command => command.OscAddress.All(character => character <= 0x7F)));
         True(!ModelCommandCatalog.Get(0x29).IsSendable);
         Equal("ACK 0x78: Wciśnięto scenariusz 1", ModelCommandCatalog.Get(0xF8).Name);
         return Task.CompletedTask;
@@ -147,6 +152,17 @@ public static class Program
     {
         await AssertCommandSequenceAsync("/makieta/balon/2/predkosc/70", [0x16, 0x1D]);
         await AssertCommandSequenceAsync("/makieta/wiatrak/5/predkosc/70", [0x16, 0x0D]);
+        await AssertCommandSequenceAsync("/makieta/obiekty/chmura-pompka/predkosc/10", [0x10, 0x4F]);
+        await AssertCommandSequenceAsync("/makieta/obiekty/chmura-pompka/predkosc/40", [0x13, 0x4F]);
+        await AssertCommandSequenceAsync("/makieta/obiekty/chmura-pompka/predkosc/100", [0x19, 0x4F]);
+
+        var validator = new BridgeCoordinator(
+            new FakeSerialTransport(),
+            new FakeOscTransport(),
+            new MemoryStateStore(),
+            new TestLog(),
+            FastOptions());
+        True(!validator.TryQueueOscModelCommand("/makieta/obiekty/chmura-pompka/predkosc/45"));
     }
 
     private static async Task TestOscNumberedRangesAsync()

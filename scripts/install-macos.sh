@@ -28,6 +28,12 @@ ditto "$PUBLISH_DIR" "$INSTALL_DIR"
 if [[ ! -f "$CONFIG_PATH" ]]; then
   cp "$PROJECT_DIR/config/appsettings.example.json" "$CONFIG_PATH"
   echo "Created configuration: $CONFIG_PATH"
+else
+  BRIDGE_CURRENT_LISTEN_URL="$(plutil -extract Web.ListenUrl raw -o - "$CONFIG_PATH" 2>/dev/null || true)"
+  if [[ "$BRIDGE_CURRENT_LISTEN_URL" == "http://127.0.0.1:8080" ]]; then
+    plutil -replace Web.ListenUrl -string "http://0.0.0.0:8080" "$CONFIG_PATH"
+    echo "Updated Web.ListenUrl for LAN access: http://0.0.0.0:8080"
+  fi
 fi
 
 sed \

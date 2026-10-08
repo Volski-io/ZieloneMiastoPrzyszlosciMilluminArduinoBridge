@@ -229,13 +229,26 @@ public static class ModelCommandCatalog
                 continue;
             }
 
-            if (char.IsLetterOrDigit(character))
+            var asciiCharacter = character switch
+            {
+                'ą' or 'Ą' => 'a',
+                'ć' or 'Ć' => 'c',
+                'ę' or 'Ę' => 'e',
+                'ł' or 'Ł' => 'l',
+                'ń' or 'Ń' => 'n',
+                'ó' or 'Ó' => 'o',
+                'ś' or 'Ś' => 's',
+                'ź' or 'Ź' or 'ż' or 'Ż' => 'z',
+                _ => character
+            };
+
+            if (asciiCharacter <= 0x7F && char.IsLetterOrDigit(asciiCharacter))
             {
                 if (separatorPending && result.Length > 0)
                 {
                     result.Append('-');
                 }
-                result.Append(char.ToLowerInvariant(character));
+                result.Append(char.ToLowerInvariant(asciiCharacter));
                 separatorPending = false;
             }
             else

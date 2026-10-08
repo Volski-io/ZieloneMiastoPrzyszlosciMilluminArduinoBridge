@@ -18,6 +18,9 @@ const elements = {
   numberedSpeed: document.querySelector('#numberedSpeed'),
   numberedRoutePreview: document.querySelector('#numberedRoutePreview'),
   sendNumberedSequence: document.querySelector('#sendNumberedSequence'),
+  pumpSpeed: document.querySelector('#pumpSpeed'),
+  pumpRoutePreview: document.querySelector('#pumpRoutePreview'),
+  sendPumpSequence: document.querySelector('#sendPumpSequence'),
   sectorDevice: document.querySelector('#sectorDevice'),
   sectorFrom: document.querySelector('#sectorFrom'),
   sectorTo: document.querySelector('#sectorTo'),
@@ -251,6 +254,10 @@ function updateNumberedSequence() {
   elements.numberedRoutePreview.textContent = `${baseAddress}/${itemPart}/${actionPart}`;
 }
 
+function updatePumpSequence() {
+  elements.pumpRoutePreview.textContent = `/makieta/obiekty/chmura-pompka/predkosc/${elements.pumpSpeed.value}`;
+}
+
 function showToast(message, error = false) {
   clearTimeout(state.toastTimer);
   elements.toast.textContent = message;
@@ -285,11 +292,14 @@ for (const element of [elements.numberedDevice, elements.numberedFrom, elements.
   element.addEventListener('change', updateNumberedSequence);
 }
 elements.sendNumberedSequence.addEventListener('click', () => sendOscModel(elements.numberedRoutePreview.textContent));
+elements.pumpSpeed.addEventListener('change', updatePumpSequence);
+elements.sendPumpSequence.addEventListener('click', () => sendOscModel(elements.pumpRoutePreview.textContent));
 elements.sectorDevice.addEventListener('change', updateSectorSequence);
 elements.sectorFrom.addEventListener('change', updateSectorSequence);
 elements.sectorTo.addEventListener('change', updateSectorSequence);
 elements.sendSectorSequence.addEventListener('click', () => sendOscModel(elements.sectorRoutePreview.textContent));
 updateNumberedSequence();
+updatePumpSequence();
 updateSectorSequence();
 
 Promise.all([loadCommands(), refreshStatus(), refreshLogs()]).catch(error => showToast(error.message, true));

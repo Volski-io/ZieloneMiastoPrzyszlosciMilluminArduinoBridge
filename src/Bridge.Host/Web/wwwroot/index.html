@@ -64,6 +64,18 @@
             <button id="sendNumberedSequence" class="button primary" type="button">Wyślij</button>
           </div>
         </article>
+        <article class="pump-sequence-card">
+          <code id="pumpRoutePreview">/makieta/obiekty/chmura-pompka/predkosc/40</code>
+          <p>Ustawia prędkość, czeka na ACK i dopiero wtedy uruchamia pompkę chmury.</p>
+          <span>Dostępny zakres: 10–100% co 10%.</span>
+          <div class="sequence-actions">
+            <select id="pumpSpeed" aria-label="Prędkość pompki chmury">
+              <option>10</option><option>20</option><option>30</option><option selected>40</option><option>50</option>
+              <option>60</option><option>70</option><option>80</option><option>90</option><option>100</option>
+            </select>
+            <button id="sendPumpSequence" class="button primary" type="button">Uruchom</button>
+          </div>
+        </article>
         <article class="sector-sequence-card">
           <code id="sectorRoutePreview">/makieta/slupy/sektory/1-3/on</code>
           <p>Czyści wybór, wybiera pojedynczy sektor albo domknięty zakres, a następnie stosuje go do elementu.</p>
